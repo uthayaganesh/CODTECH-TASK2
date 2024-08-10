@@ -1,0 +1,64 @@
+/* Weather Monitoring Station */
+
+
+#include <DHT.h>
+#include <Adafruit_Sensor.h>
+#include <Adafruit_BMP280.h>
+#include <ESP8266WiFi.h>
+#include <FirebaseESP8266.h>
+
+// Replace with your network credentials
+const char* ssid = "YOUR_SSID";
+const char* password = "YOUR_PASSWORD";
+
+// Firebase project details
+#define FIREBASE_HOST "YOUR_FIREBASE_PROJECT_ID.firebaseio.com"
+#define FIREBASE_AUTH "YOUR_FIREBASE_DATABASE_SECRET"
+
+DHT dht(D1, DHT22);
+Adafruit_BMP280 bmp;
+
+FirebaseData firebaseData;
+
+void setup() {
+  Serial.begin(115200);
+ 
+  // Initialize sensors
+  dht.begin();
+  if (!bmp.begin(0x76)) {
+    Serial.println(F("Could not find a valid BMP280 sensor, check wiring!"));
+    while (1);
+  }
+ 
+  // Connect to Wi-Fi
+  WiFi.begin(ssid, password);
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+  Serial.println("WiFi connected");
+
+  // Connect to Firebase
+  Firebase.begin(FIREBASE_HOST, FIREBASE_AUTH);
+  Firebase.reconnectWiFi(true);
+}
+
+void loop() {
+  // Read sensor data
+  float temperature = dht.readTemperature();
+  float humidity = dht.readHumidity();
+  float pressure = bmp.readPressure() / 100.0F;
+
+  // Ensure valid readings
+  if (isnan(temperature) || isnan(humidity) || isnan(pressure)) {
+    Serial.println("Failed to read from sensors!");
+    return;
+  }
+ 
+  // Publish data to Firebase
+  Firebase.setFloat(firebaseData, "/weather/temperature", temperature);
+  Firebase.setFloat(firebaseData, "/weather/humidity", humidity);
+  Firebase.setFloat(firebaseData, "/weather/pressure", pressure);
+ 
+  delay(60000); // Delay 1 minute between readings
+}
